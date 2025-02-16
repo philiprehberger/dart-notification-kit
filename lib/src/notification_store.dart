@@ -28,6 +28,16 @@ class NotificationStore {
   List<Notification> byPriority(Priority priority) =>
       _store.values.where((n) => n.priority == priority).toList();
 
+  /// Get notifications by group ID.
+  List<Notification> byGroup(String groupId) {
+    return _store.values.where((n) => n.groupId == groupId).toList();
+  }
+
+  /// Get notifications by delivery status.
+  List<Notification> byStatus(DeliveryStatus status) {
+    return _store.values.where((n) => n.deliveryStatus == status).toList();
+  }
+
   /// The number of notifications in the store.
   int get count => _store.length;
 

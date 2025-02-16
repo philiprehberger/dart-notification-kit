@@ -16,7 +16,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  philiprehberger_notification_kit: ^0.1.0
+  philiprehberger_notification_kit: ^0.2.0
 ```
 
 Then run:
@@ -82,6 +82,40 @@ final urgent = store.byPriority(Priority.high);
 final channelNotifs = store.byChannel('alerts');
 ```
 
+### Notification Groups
+
+```dart
+final store = NotificationStore();
+
+store.add(Notification(title: 'Alert 1', body: 'text', groupId: 'alerts'));
+store.add(Notification(title: 'Alert 2', body: 'text', groupId: 'alerts'));
+
+final alertGroup = store.byGroup('alerts'); // 2 notifications
+```
+
+### Delivery Status
+
+```dart
+final n = Notification(title: 'Test', body: 'body');
+print(n.deliveryStatus); // DeliveryStatus.pending
+
+n.deliveryStatus = DeliveryStatus.delivered;
+
+final pending = store.byStatus(DeliveryStatus.pending);
+```
+
+### Repeating Notifications
+
+```dart
+final scheduler = NotificationScheduler();
+
+final ids = scheduler.scheduleRepeating(
+  Notification(title: 'Standup', body: 'Daily standup reminder', deliverAt: DateTime.now()),
+  interval: Duration(hours: 24),
+  count: 7,
+);
+```
+
 ### Delivery Callbacks
 
 ```dart
@@ -95,7 +129,8 @@ final manager = NotificationManager(
 
 | Class / Method | Description |
 |--------|-------------|
-| `Notification()` | Create a notification with title, body, channel, priority, payload, and optional delivery time |
+| `Notification()` | Create a notification with title, body, channel, priority, payload, group, delivery status, and optional delivery time |
+| `DeliveryStatus` | Enum for notification delivery status (pending, delivered, failed, retrying) |
 | `NotificationChannel()` | Define a named channel with importance and sound settings |
 | `NotificationStore.add()` | Add a notification to the in-memory store |
 | `NotificationStore.get()` | Retrieve a notification by ID |
@@ -104,12 +139,15 @@ final manager = NotificationManager(
 | `NotificationStore.byChannel()` | Filter notifications by channel name |
 | `NotificationStore.byPriority()` | Filter notifications by priority level |
 | `NotificationStore.clear()` | Remove all notifications from the store |
+| `NotificationStore.byGroup()` | Filter notifications by group ID |
+| `NotificationStore.byStatus()` | Filter notifications by delivery status |
 | `NotificationScheduler.schedule()` | Schedule a notification for delivery |
 | `NotificationScheduler.cancel()` | Cancel a pending notification |
 | `NotificationScheduler.pending()` | List all pending notifications |
 | `NotificationScheduler.delivered()` | List all delivered notifications |
 | `NotificationScheduler.deliverDue()` | Deliver all notifications whose time has arrived |
 | `NotificationScheduler.reschedule()` | Change the delivery time of a pending notification |
+| `NotificationScheduler.scheduleRepeating()` | Schedule a notification to repeat at a fixed interval |
 | `NotificationManager.schedule()` | Schedule via the high-level facade |
 | `NotificationManager.deliverDue()` | Deliver due notifications through the backend |
 | `NotificationManager.cancel()` | Cancel a pending notification |

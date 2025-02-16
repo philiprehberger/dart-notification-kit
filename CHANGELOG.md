@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-04-01
+
+### Added
+- `DeliveryStatus` enum with pending, delivered, failed, and retrying states
+- `groupId` field on `Notification` for grouping related notifications
+- `deliveryStatus` field on `Notification` with default of `DeliveryStatus.pending`
+- `NotificationStore.byGroup()` to filter notifications by group ID
+- `NotificationStore.byStatus()` to filter notifications by delivery status
+- `NotificationScheduler.scheduleRepeating()` to schedule repeating notifications at a fixed interval
+
 ## [0.1.0] - 2026-04-01
 
 ### Added
