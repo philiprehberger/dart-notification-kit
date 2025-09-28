@@ -7,3 +7,5 @@ export 'src/notification_scheduler.dart';
 export 'src/notification_store.dart';
 export 'src/delivery_backend.dart';
 export 'src/notification_manager.dart';
+export 'src/notification_template.dart';
+export 'src/rate_limiter.dart';

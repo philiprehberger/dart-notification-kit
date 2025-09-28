@@ -97,4 +97,49 @@ Future<void> main() async {
 
   final due = scheduler.deliverDue();
   print('Delivered overdue: ${due.length}');
+
+  // Notification templates with variable substitution
+  final welcomeTemplate = NotificationTemplate(
+    titleTemplate: 'Welcome {{name}}!',
+    bodyTemplate: 'Your account {{accountId}} is ready.',
+    channel: updates,
+    priority: Priority.normal,
+  );
+
+  print('Placeholders: ${welcomeTemplate.placeholders}');
+
+  final welcomeNotif = welcomeTemplate.build({
+    'name': 'Alice',
+    'accountId': 'ACC-123',
+  });
+  print('Template result: ${welcomeNotif.title} — ${welcomeNotif.body}');
+
+  // Rate limiting for per-channel cooldowns
+  final limiter = RateLimiter(cooldown: Duration(seconds: 30));
+  final rateLimitedManager = NotificationManager(
+    backend: backend,
+    rateLimiter: limiter,
+  );
+
+  final pastTime = DateTime.now().subtract(Duration(minutes: 1));
+  rateLimitedManager.schedule(Notification(
+    title: 'Alert 1',
+    body: 'First alert',
+    channel: alerts,
+    deliverAt: pastTime,
+  ));
+  rateLimitedManager.schedule(Notification(
+    title: 'Alert 2',
+    body: 'Second alert (will be rate limited)',
+    channel: alerts,
+    deliverAt: pastTime,
+  ));
+
+  final rateLimited = await rateLimitedManager.deliverDue();
+  print('Delivered with rate limiting: ${rateLimited.length}'); // 1
+
+  // Bulk removal with removeWhere
+  store.add(Notification(id: 'n3', title: 'Old', body: 'old', priority: Priority.low));
+  final removed = store.removeWhere((n) => n.priority == Priority.low);
+  print('Removed $removed low-priority notifications');
 }
