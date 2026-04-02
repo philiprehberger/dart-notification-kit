@@ -171,6 +171,59 @@ void main() {
     });
   });
 
+  group('Notification groups', () {
+    test('byGroup filters by groupId', () {
+      final store = NotificationStore();
+      store.add(Notification(title: 'A', body: 'a', groupId: 'g1'));
+      store.add(Notification(title: 'B', body: 'b', groupId: 'g1'));
+      store.add(Notification(title: 'C', body: 'c', groupId: 'g2'));
+      expect(store.byGroup('g1').length, equals(2));
+    });
+  });
+
+  group('Delivery status', () {
+    test('default status is pending', () {
+      final n = Notification(title: 'Test', body: 'test');
+      expect(n.deliveryStatus, equals(DeliveryStatus.pending));
+    });
+
+    test('byStatus filters correctly', () {
+      final store = NotificationStore();
+      final n1 = Notification(title: 'A', body: 'a');
+      final n2 = Notification(title: 'B', body: 'b');
+      n2.deliveryStatus = DeliveryStatus.delivered;
+      store.add(n1);
+      store.add(n2);
+      expect(store.byStatus(DeliveryStatus.pending).length, equals(1));
+      expect(store.byStatus(DeliveryStatus.delivered).length, equals(1));
+    });
+  });
+
+  group('Repeating notifications', () {
+    test('scheduleRepeating creates multiple notifications', () {
+      final scheduler = NotificationScheduler();
+      final ids = scheduler.scheduleRepeating(
+        Notification(title: 'Reminder', body: 'test', deliverAt: DateTime.now()),
+        interval: const Duration(hours: 1),
+        count: 5,
+      );
+      expect(ids.length, equals(5));
+      expect(scheduler.pending().length, equals(5));
+    });
+
+    test('scheduleRepeating respects endAt', () {
+      final scheduler = NotificationScheduler();
+      final now = DateTime.now();
+      final ids = scheduler.scheduleRepeating(
+        Notification(title: 'Test', body: 'test', deliverAt: now),
+        interval: const Duration(hours: 1),
+        count: 100,
+        endAt: now.add(const Duration(hours: 3)),
+      );
+      expect(ids.length, lessThanOrEqualTo(4));
+    });
+  });
+
   group('NotificationScheduler', () {
     late NotificationScheduler scheduler;
 

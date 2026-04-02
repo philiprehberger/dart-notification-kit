@@ -67,10 +67,43 @@ class NotificationScheduler {
       channel: old.channel,
       priority: old.priority,
       payload: old.payload,
+      groupId: old.groupId,
       deliverAt: newTime,
       createdAt: old.createdAt,
     ));
     return true;
+  }
+
+  /// Schedule a notification to repeat at a fixed interval.
+  ///
+  /// Creates multiple notification copies with staggered `deliverAt` times.
+  /// Returns the list of scheduled notification IDs.
+  List<String> scheduleRepeating(
+    Notification notification, {
+    required Duration interval,
+    int count = 10,
+    DateTime? endAt,
+  }) {
+    final ids = <String>[];
+    var nextTime = notification.deliverAt ?? DateTime.now();
+
+    for (var i = 0; i < count; i++) {
+      if (endAt != null && nextTime.isAfter(endAt)) break;
+
+      final copy = Notification(
+        title: notification.title,
+        body: notification.body,
+        channel: notification.channel,
+        priority: notification.priority,
+        payload: notification.payload,
+        groupId: notification.groupId,
+        deliverAt: nextTime,
+      );
+      schedule(copy);
+      ids.add(copy.id);
+      nextTime = nextTime.add(interval);
+    }
+    return ids;
   }
 
   /// Clear all pending and delivered notifications.
