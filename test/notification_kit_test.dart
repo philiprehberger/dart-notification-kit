@@ -340,6 +340,137 @@ void main() {
     });
   });
 
+  group('NotificationTemplate', () {
+    test('build substitutes variables in title and body', () {
+      final template = NotificationTemplate(
+        titleTemplate: 'Hello {{name}}',
+        bodyTemplate: 'Your order {{orderId}} is {{status}}',
+      );
+
+      final n = template.build({
+        'name': 'Alice',
+        'orderId': '42',
+        'status': 'shipped',
+      });
+
+      expect(n.title, equals('Hello Alice'));
+      expect(n.body, equals('Your order 42 is shipped'));
+    });
+
+    test('placeholders extracts all placeholder names', () {
+      final template = NotificationTemplate(
+        titleTemplate: '{{greeting}} {{name}}',
+        bodyTemplate: 'Your {{item}} is {{status}}',
+      );
+
+      final names = template.placeholders;
+      expect(names, containsAll(['greeting', 'name', 'item', 'status']));
+      expect(names, hasLength(4));
+    });
+
+    test('build leaves missing variables as-is', () {
+      final template = NotificationTemplate(
+        titleTemplate: 'Hello {{name}}',
+        bodyTemplate: 'Order {{orderId}}',
+      );
+
+      final n = template.build({'name': 'Bob'});
+
+      expect(n.title, equals('Hello Bob'));
+      expect(n.body, equals('Order {{orderId}}'));
+    });
+
+    test('build applies channel and priority', () {
+      final channel = NotificationChannel(name: 'alerts');
+      final template = NotificationTemplate(
+        titleTemplate: 'Alert',
+        bodyTemplate: 'Something happened',
+        channel: channel,
+        priority: Priority.high,
+      );
+
+      final n = template.build({});
+
+      expect(n.channel?.name, equals('alerts'));
+      expect(n.priority, equals(Priority.high));
+    });
+
+    test('placeholders deduplicates across templates', () {
+      final template = NotificationTemplate(
+        titleTemplate: '{{name}}',
+        bodyTemplate: 'Hello {{name}}',
+      );
+
+      expect(template.placeholders, hasLength(1));
+      expect(template.placeholders, contains('name'));
+    });
+  });
+
+  group('RateLimiter', () {
+    test('allow returns true on first call', () {
+      final limiter = RateLimiter(cooldown: Duration(seconds: 10));
+      expect(limiter.allow('alerts'), isTrue);
+    });
+
+    test('allow returns false within cooldown', () {
+      final limiter = RateLimiter(cooldown: Duration(seconds: 10));
+      limiter.allow('alerts');
+      expect(limiter.allow('alerts'), isFalse);
+    });
+
+    test('allow returns true for different channels', () {
+      final limiter = RateLimiter(cooldown: Duration(seconds: 10));
+      limiter.allow('alerts');
+      expect(limiter.allow('updates'), isTrue);
+    });
+
+    test('reset clears tracking for a channel', () {
+      final limiter = RateLimiter(cooldown: Duration(seconds: 10));
+      limiter.allow('alerts');
+      limiter.reset('alerts');
+      expect(limiter.allow('alerts'), isTrue);
+    });
+
+    test('resetAll clears all tracking', () {
+      final limiter = RateLimiter(cooldown: Duration(seconds: 10));
+      limiter.allow('alerts');
+      limiter.allow('updates');
+      limiter.resetAll();
+      expect(limiter.allow('alerts'), isTrue);
+      expect(limiter.allow('updates'), isTrue);
+    });
+
+    test('cooldown exposes duration', () {
+      final limiter = RateLimiter(cooldown: Duration(seconds: 5));
+      expect(limiter.cooldown, equals(Duration(seconds: 5)));
+    });
+  });
+
+  group('NotificationStore removeWhere', () {
+    test('removeWhere removes matching notifications', () {
+      final store = NotificationStore();
+      store.add(Notification(id: 'a', title: 'Low', body: 'b', priority: Priority.low));
+      store.add(Notification(id: 'b', title: 'High', body: 'b', priority: Priority.high));
+      store.add(Notification(id: 'c', title: 'Low2', body: 'b', priority: Priority.low));
+
+      final removed = store.removeWhere((n) => n.priority == Priority.low);
+
+      expect(removed, equals(2));
+      expect(store.count, equals(1));
+      expect(store.get('b')?.title, equals('High'));
+    });
+
+    test('removeWhere returns 0 when nothing matches', () {
+      final store = NotificationStore();
+      store.add(Notification(id: 'a', title: 'A', body: 'a'));
+
+      final removed = store.removeWhere((n) => n.priority == Priority.urgent);
+
+      expect(removed, equals(0));
+      expect(store.count, equals(1));
+    });
+  });
+
   group('NotificationManager', () {
     late MemoryDeliveryBackend backend;
     late NotificationManager manager;
@@ -418,6 +549,39 @@ void main() {
 
       expect(delivered, isEmpty);
       expect(backend.deliveries, isEmpty);
+    });
+
+    test('rate limiter blocks rapid delivery on same channel', () async {
+      final limiter = RateLimiter(cooldown: Duration(seconds: 60));
+      final rateLimitedBackend = MemoryDeliveryBackend();
+      final rateLimitedManager = NotificationManager(
+        backend: rateLimitedBackend,
+        rateLimiter: limiter,
+      );
+
+      final channel = NotificationChannel(name: 'alerts');
+      final past = DateTime.now().subtract(Duration(hours: 1));
+
+      rateLimitedManager.schedule(Notification(
+        id: 'r1',
+        title: 'First',
+        body: 'B',
+        channel: channel,
+        deliverAt: past,
+      ));
+      rateLimitedManager.schedule(Notification(
+        id: 'r2',
+        title: 'Second',
+        body: 'B',
+        channel: channel,
+        deliverAt: past,
+      ));
+
+      final delivered = await rateLimitedManager.deliverDue();
+
+      expect(delivered, hasLength(1));
+      expect(delivered.first.id, equals('r1'));
+      expect(rateLimitedBackend.deliveries, hasLength(1));
     });
   });
 }

@@ -16,7 +16,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  philiprehberger_notification_kit: ^0.2.0
+  philiprehberger_notification_kit: ^0.3.0
 ```
 
 Then run:
@@ -116,6 +116,49 @@ final ids = scheduler.scheduleRepeating(
 );
 ```
 
+### Notification Templates
+
+```dart
+final template = NotificationTemplate(
+  titleTemplate: 'Hello {{name}}',
+  bodyTemplate: 'Your order {{orderId}} is {{status}}',
+  priority: Priority.high,
+);
+
+// Extract placeholder names
+print(template.placeholders); // [name, orderId, status]
+
+// Build a notification with variable substitution
+final notification = template.build({
+  'name': 'Alice',
+  'orderId': '42',
+  'status': 'shipped',
+});
+```
+
+### Rate Limiting
+
+```dart
+final limiter = RateLimiter(cooldown: Duration(seconds: 30));
+
+final manager = NotificationManager(
+  backend: backend,
+  rateLimiter: limiter,
+);
+
+// Rapid deliveries on the same channel are throttled
+```
+
+### Bulk Removal
+
+```dart
+final store = NotificationStore();
+
+// Remove all low-priority notifications
+final removed = store.removeWhere((n) => n.priority == Priority.low);
+print('Removed $removed notifications');
+```
+
 ### Delivery Callbacks
 
 ```dart
@@ -141,6 +184,14 @@ final manager = NotificationManager(
 | `NotificationStore.clear()` | Remove all notifications from the store |
 | `NotificationStore.byGroup()` | Filter notifications by group ID |
 | `NotificationStore.byStatus()` | Filter notifications by delivery status |
+| `NotificationStore.removeWhere()` | Remove all notifications matching a predicate |
+| `NotificationTemplate()` | Create a reusable template with `{{variable}}` placeholders |
+| `NotificationTemplate.build()` | Build a notification by substituting variables into the template |
+| `NotificationTemplate.placeholders` | Extract all placeholder names from the template |
+| `RateLimiter()` | Create a per-channel rate limiter with a cooldown duration |
+| `RateLimiter.allow()` | Check if a channel is allowed to deliver |
+| `RateLimiter.reset()` | Clear cooldown tracking for a channel |
+| `RateLimiter.resetAll()` | Clear all cooldown tracking |
 | `NotificationScheduler.schedule()` | Schedule a notification for delivery |
 | `NotificationScheduler.cancel()` | Cancel a pending notification |
 | `NotificationScheduler.pending()` | List all pending notifications |

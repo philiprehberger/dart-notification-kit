@@ -41,6 +41,22 @@ class NotificationStore {
   /// The number of notifications in the store.
   int get count => _store.length;
 
+  /// Remove all notifications matching the [predicate].
+  ///
+  /// Returns the number of notifications removed.
+  int removeWhere(bool Function(Notification) predicate) {
+    final toRemove = _store.entries
+        .where((e) => predicate(e.value))
+        .map((e) => e.key)
+        .toList();
+
+    for (final key in toRemove) {
+      _store.remove(key);
+    }
+
+    return toRemove.length;
+  }
+
   /// Remove all notifications from the store.
   void clear() => _store.clear();
 }

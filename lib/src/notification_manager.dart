@@ -1,6 +1,7 @@
 import 'delivery_backend.dart';
 import 'notification.dart';
 import 'notification_scheduler.dart';
+import 'rate_limiter.dart';
 
 /// Callback invoked when a notification is delivered.
 typedef OnDeliverCallback = void Function(Notification notification);
@@ -10,6 +11,9 @@ class NotificationManager {
   final NotificationScheduler _scheduler = NotificationScheduler();
   final DeliveryBackend _backend;
 
+  /// Optional rate limiter for per-channel delivery cooldowns.
+  final RateLimiter? rateLimiter;
+
   /// Optional callback invoked after each notification is delivered.
   OnDeliverCallback? onDeliver;
 
@@ -17,6 +21,7 @@ class NotificationManager {
   NotificationManager({
     required DeliveryBackend backend,
     this.onDeliver,
+    this.rateLimiter,
   }) : _backend = backend;
 
   /// Schedule a notification for delivery.
@@ -38,10 +43,16 @@ class NotificationManager {
   /// Returns the list of notifications that were delivered.
   Future<List<Notification>> deliverDue({DateTime? now}) async {
     final due = _scheduler.deliverDue(now: now);
+    final delivered = <Notification>[];
     for (final notification in due) {
+      final channelName = notification.channel?.name ?? '';
+      if (rateLimiter != null && !rateLimiter!.allow(channelName)) {
+        continue;
+      }
       await _backend.deliver(notification);
       onDeliver?.call(notification);
+      delivered.add(notification);
     }
-    return due;
+    return delivered;
   }
 }

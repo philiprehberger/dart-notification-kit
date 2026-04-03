@@ -1,7 +1,7 @@
 name: philiprehberger_notification_kit
 description: >-
   Unified notification scheduling with channels, priorities, and payload management
-version: 0.2.0
+version: 0.3.0
 homepage: https://philiprehberger.com/open-source-packages/dart/philiprehberger_notification_kit
 repository: https://github.com/philiprehberger/dart-notification-kit
 issue_tracker: https://github.com/philiprehberger/dart-notification-kit/issues
