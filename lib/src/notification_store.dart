@@ -38,6 +38,46 @@ class NotificationStore {
     return _store.values.where((n) => n.deliveryStatus == status).toList();
   }
 
+  /// Search notifications by combining filters with AND semantics.
+  ///
+  /// All non-null parameters are combined as filters:
+  /// - [query] matches case-insensitively as a substring against title and body.
+  /// - [priority] requires an exact priority match.
+  /// - [channel] requires the channel name to match exactly.
+  /// - [after] keeps notifications whose `deliverAt` is at or after this time.
+  /// - [before] keeps notifications whose `deliverAt` is at or before this time.
+  ///
+  /// Notifications without a `deliverAt` are excluded when [after] or [before]
+  /// is provided.
+  List<Notification> search({
+    String? query,
+    Priority? priority,
+    String? channel,
+    DateTime? after,
+    DateTime? before,
+  }) {
+    final lowered = query?.toLowerCase();
+
+    return _store.values.where((n) {
+      if (lowered != null) {
+        final inTitle = n.title.toLowerCase().contains(lowered);
+        final inBody = n.body.toLowerCase().contains(lowered);
+        if (!inTitle && !inBody) return false;
+      }
+      if (priority != null && n.priority != priority) return false;
+      if (channel != null && n.channel?.name != channel) return false;
+      if (after != null) {
+        if (n.deliverAt == null) return false;
+        if (n.deliverAt!.isBefore(after)) return false;
+      }
+      if (before != null) {
+        if (n.deliverAt == null) return false;
+        if (n.deliverAt!.isAfter(before)) return false;
+      }
+      return true;
+    }).toList();
+  }
+
   /// The number of notifications in the store.
   int get count => _store.length;
 

@@ -584,4 +584,197 @@ void main() {
       expect(rateLimitedBackend.deliveries, hasLength(1));
     });
   });
+
+  group('NotificationStore.search', () {
+    final base = DateTime(2026, 4, 1, 12, 0);
+    final alerts = NotificationChannel(name: 'alerts');
+    final updates = NotificationChannel(name: 'updates');
+
+    NotificationStore buildStore() {
+      final store = NotificationStore();
+      store.add(Notification(
+        id: 's1',
+        title: 'Server Down',
+        body: 'Production is unreachable',
+        channel: alerts,
+        priority: Priority.high,
+        deliverAt: base,
+      ));
+      store.add(Notification(
+        id: 's2',
+        title: 'Welcome',
+        body: 'Thanks for signing up!',
+        channel: updates,
+        priority: Priority.normal,
+        deliverAt: base.add(Duration(hours: 1)),
+      ));
+      store.add(Notification(
+        id: 's3',
+        title: 'Critical Alert',
+        body: 'Database server overheated',
+        channel: alerts,
+        priority: Priority.urgent,
+        deliverAt: base.add(Duration(hours: 2)),
+      ));
+      store.add(Notification(
+        id: 's4',
+        title: 'Newsletter',
+        body: 'Monthly digest is ready',
+        channel: updates,
+        priority: Priority.low,
+        deliverAt: base.add(Duration(hours: 3)),
+      ));
+      return store;
+    }
+
+    test('search by query is case-insensitive across title and body', () {
+      final store = buildStore();
+      final results = store.search(query: 'SERVER');
+      expect(results.map((n) => n.id), containsAll(['s1', 's3']));
+      expect(results, hasLength(2));
+    });
+
+    test('search by query matches body only', () {
+      final store = buildStore();
+      final results = store.search(query: 'digest');
+      expect(results, hasLength(1));
+      expect(results.first.id, equals('s4'));
+    });
+
+    test('search by priority filters exact match', () {
+      final store = buildStore();
+      final results = store.search(priority: Priority.urgent);
+      expect(results, hasLength(1));
+      expect(results.first.id, equals('s3'));
+    });
+
+    test('search by channel filters by channel name', () {
+      final store = buildStore();
+      final results = store.search(channel: 'alerts');
+      expect(results.map((n) => n.id), containsAll(['s1', 's3']));
+      expect(results, hasLength(2));
+    });
+
+    test('search by date range with after and before', () {
+      final store = buildStore();
+      final results = store.search(
+        after: base.add(Duration(minutes: 30)),
+        before: base.add(Duration(hours: 2, minutes: 30)),
+      );
+      expect(results.map((n) => n.id), containsAll(['s2', 's3']));
+      expect(results, hasLength(2));
+    });
+
+    test('search after is inclusive', () {
+      final store = buildStore();
+      final results = store.search(after: base);
+      expect(results, hasLength(4));
+    });
+
+    test('search before is inclusive', () {
+      final store = buildStore();
+      final results = store.search(before: base);
+      expect(results, hasLength(1));
+      expect(results.first.id, equals('s1'));
+    });
+
+    test('search combines multiple filters with AND', () {
+      final store = buildStore();
+      final results = store.search(
+        query: 'server',
+        priority: Priority.urgent,
+        channel: 'alerts',
+        after: base.add(Duration(hours: 1)),
+        before: base.add(Duration(hours: 3)),
+      );
+      expect(results, hasLength(1));
+      expect(results.first.id, equals('s3'));
+    });
+
+    test('search with no filters returns everything', () {
+      final store = buildStore();
+      expect(store.search(), hasLength(4));
+    });
+
+    test('search returns empty when no notification matches all filters', () {
+      final store = buildStore();
+      final results = store.search(
+        query: 'server',
+        priority: Priority.low,
+      );
+      expect(results, isEmpty);
+    });
+
+    test('search with date filter excludes notifications without deliverAt', () {
+      final store = NotificationStore();
+      store.add(Notification(id: 'no-time', title: 'Hello', body: 'world'));
+      store.add(Notification(
+        id: 'with-time',
+        title: 'Hello',
+        body: 'world',
+        deliverAt: base,
+      ));
+
+      final results = store.search(after: base.subtract(Duration(hours: 1)));
+      expect(results, hasLength(1));
+      expect(results.first.id, equals('with-time'));
+    });
+  });
+
+  group('LoggingDeliveryBackend', () {
+    test('sink fires before inner.deliver is called', () async {
+      final inner = MemoryDeliveryBackend();
+      final logged = <String>[];
+      final backend = LoggingDeliveryBackend(
+        inner: inner,
+        sink: (n) => logged.add(n.id),
+      );
+
+      await backend.deliver(Notification(id: 'a', title: 'A', body: 'a'));
+
+      expect(logged, equals(['a']));
+      expect(inner.deliveries, hasLength(1));
+      expect(inner.deliveries.first.id, equals('a'));
+    });
+
+    test('forwards multiple notifications in order', () async {
+      final inner = MemoryDeliveryBackend();
+      final logged = <String>[];
+      final backend = LoggingDeliveryBackend(
+        inner: inner,
+        sink: (n) => logged.add(n.id),
+      );
+
+      await backend.deliver(Notification(id: 'a', title: 'A', body: 'a'));
+      await backend.deliver(Notification(id: 'b', title: 'B', body: 'b'));
+      await backend.deliver(Notification(id: 'c', title: 'C', body: 'c'));
+
+      expect(logged, equals(['a', 'b', 'c']));
+      expect(inner.deliveries.map((n) => n.id), equals(['a', 'b', 'c']));
+    });
+
+    test('integrates with NotificationManager', () async {
+      final inner = MemoryDeliveryBackend();
+      final logged = <Notification>[];
+      final backend = LoggingDeliveryBackend(
+        inner: inner,
+        sink: logged.add,
+      );
+      final manager = NotificationManager(backend: backend);
+
+      final past = DateTime.now().subtract(Duration(hours: 1));
+      manager.schedule(Notification(
+        id: 'm1',
+        title: 'Test',
+        body: 'B',
+        deliverAt: past,
+      ));
+
+      await manager.deliverDue();
+
+      expect(logged, hasLength(1));
+      expect(logged.first.id, equals('m1'));
+      expect(inner.deliveries, hasLength(1));
+    });
+  });
 }

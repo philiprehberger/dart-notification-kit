@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-28
+
+### Added
+- `NotificationStore.search()` for combining query, priority, channel, and date-range filters with AND semantics
+- `LoggingDeliveryBackend` decorator that emits each notification to a sink before delegating to an inner backend
+
+### Fixed
+- Corrected README requirements line to reflect actual SDK constraint (`Dart >= 3.6`)
+
 ## [0.3.0] - 2026-04-02
 
 ### Added

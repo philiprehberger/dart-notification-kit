@@ -8,7 +8,7 @@ Unified notification scheduling with channels, priorities, and payload managemen
 
 ## Requirements
 
-- Dart >= 3.5
+- Dart >= 3.6
 
 ## Installation
 
@@ -16,7 +16,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  philiprehberger_notification_kit: ^0.3.0
+  philiprehberger_notification_kit: ^0.4.0
 ```
 
 Then run:
@@ -159,6 +159,46 @@ final removed = store.removeWhere((n) => n.priority == Priority.low);
 print('Removed $removed notifications');
 ```
 
+### Searching Notifications
+
+```dart
+final store = NotificationStore();
+final now = DateTime.now();
+
+store.add(Notification(
+  title: 'Server Down',
+  body: 'Production is unreachable',
+  priority: Priority.high,
+  deliverAt: now,
+));
+store.add(Notification(
+  title: 'Welcome',
+  body: 'Thanks for signing up!',
+  priority: Priority.normal,
+  deliverAt: now.add(Duration(hours: 1)),
+));
+
+// Combine filters with AND semantics — all non-null filters must match.
+final urgentMatches = store.search(
+  query: 'server',
+  priority: Priority.high,
+  after: now.subtract(Duration(minutes: 5)),
+  before: now.add(Duration(minutes: 5)),
+);
+```
+
+### Logging Deliveries
+
+```dart
+final inner = MemoryDeliveryBackend();
+final logged = LoggingDeliveryBackend(
+  inner: inner,
+  sink: (n) => print('[delivering] ${n.id} — ${n.title}'),
+);
+
+final manager = NotificationManager(backend: logged);
+```
+
 ### Delivery Callbacks
 
 ```dart
@@ -185,6 +225,7 @@ final manager = NotificationManager(
 | `NotificationStore.byGroup()` | Filter notifications by group ID |
 | `NotificationStore.byStatus()` | Filter notifications by delivery status |
 | `NotificationStore.removeWhere()` | Remove all notifications matching a predicate |
+| `NotificationStore.search()` | Search notifications by query, priority, channel, and `deliverAt` date range (AND-combined) |
 | `NotificationTemplate()` | Create a reusable template with `{{variable}}` placeholders |
 | `NotificationTemplate.build()` | Build a notification by substituting variables into the template |
 | `NotificationTemplate.placeholders` | Extract all placeholder names from the template |
@@ -203,6 +244,7 @@ final manager = NotificationManager(
 | `NotificationManager.deliverDue()` | Deliver due notifications through the backend |
 | `NotificationManager.cancel()` | Cancel a pending notification |
 | `MemoryDeliveryBackend` | In-memory backend for testing |
+| `LoggingDeliveryBackend` | Decorator that emits each notification to a sink before delegating to an inner backend |
 
 ## Development
 
